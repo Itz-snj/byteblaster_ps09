@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { VertexAI } from '@google-cloud/vertexai';
 
-const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'byteblaster-348ea';
-const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-
-const vertex_ai = new VertexAI({ project: PROJECT_ID, location: LOCATION });
-const model = 'gemini-2.0-flash-001';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = 'gemini-2.0-flash-001';
 
 export async function POST(request: NextRequest) {
+  if (!GEMINI_API_KEY) {
+    return NextResponse.json(
+      { error: 'GEMINI_API_KEY not configured' },
+      { status: 500 }
+    );
+  }
+
   try {
     const { code, issue, language } = await request.json();
 
@@ -22,17 +25,28 @@ ${code}
 
 Provide only the fixed code, no explanations or markdown.`;
 
-    const generativeModel = vertex_ai.preview.getGenerativeModel({
-      model: model,
-      generation_config: {
-        temperature: 0.2,
-        max_output_tokens: 2000,
-      },
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generation_config: {
+            temperature: 0.2,
+            max_output_tokens: 2000,
+          },
+        }),
+      }
+    );
 
-    const result = await generativeModel.generateContent(prompt);
-    const response = result.response;
-    const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${err}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     const codeMatch = content.match(/```[\s\S]*?```/);
     let fixedCode = content;
@@ -42,7 +56,7 @@ Provide only the fixed code, no explanations or markdown.`;
 
     return NextResponse.json({ fixedCode });
   } catch (error) {
-    console.error('Vertex AI fix generation error:', error);
+    console.error('Gemini AI fix generation error:', error);
     return NextResponse.json(
       { error: 'Fix generation failed', fixedCode: '' },
       { status: 500 }
