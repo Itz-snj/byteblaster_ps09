@@ -18,65 +18,133 @@ A real-time collaborative code review platform with AI-powered static analysis, 
 - **Monaco Editor** - Code editor (VS Code engine)
 - **Gemini API** - AI-powered code analysis
 
-## Getting Started
+## Quick Start
 
-### Install Dependencies
+### 1. Install Dependencies
 
 ```bash
 pnpm install
 ```
 
-### Run Locally
+### 2. Get Gemini API Key (Required for AI Features)
+
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Sign in with your Google account
+3. Click "Create API Key"
+4. Copy the key
+
+### 3. Configure Environment
+
+Create a `.env.local` file in the project root:
+
+```bash
+GEMINI_API_KEY=your-actual-api-key-here
+```
+
+Or set it temporarily in your terminal:
+
+```bash
+export GEMINI_API_KEY=your-actual-api-key-here
+```
+
+### 4. Run the App
 
 ```bash
 npm run dev
 ```
 
-Then open http://localhost:3000
+### 5. Open Browser
 
-### AI Setup (Gemini API)
+Navigate to http://localhost:3000
 
-The code analysis uses Google Gemini API. Get a free API key:
+## Usage Guide
 
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Click "Create API Key"
-3. Copy the key
+### Creating a Room
 
-Set the environment variable:
+1. Click "Create Room" to generate a unique room ID
+2. Share the room URL with teammates
+3. Anyone with the link can join
+
+### Importing Code
+
+- **Paste directly** - Copy code and paste into the sidebar
+- **GitHub import** - Enter a raw GitHub file URL
+- The language is auto-detected
+
+### Running AI Analysis
+
+1. Make sure code is loaded in the editor
+2. Click the "Analysis" tab in the sidebar
+3. Click "Run AI Analysis"
+4. Wait for results (check console for progress)
+
+### Reviewing Suggestions
+
+- **Critical** (red) - Security vulnerabilities, hardcoded secrets
+- **Warning** (yellow) - Anti-patterns, performance issues
+- **Info** (blue) - Code style improvements
+
+Click on a suggestion to highlight the relevant code. Click "Accept" to apply the fix or "Dismiss" to ignore.
+
+### Exporting Reports
+
+1. Click the "Export" button in the header
+2. Choose format (Markdown/PDF)
+3. Copy or download the report
+
+## Troubleshooting
+
+### "GEMINI_API_KEY not configured"
+
+Make sure your API key is set in `.env.local` or as an environment variable:
 
 ```bash
-export GEMINI_API_KEY=your-api-key-here
+# Verify it's set
+echo $GEMINI_API_KEY
+
+# If not, set it
+export GEMINI_API_KEY=your-key-here
 ```
 
-Or add to `.env.local`:
+### API quota exceeded
 
-```
-GEMINI_API_KEY=your-api-key-here
-```
+- Free tier has rate limits
+- Check [Google AI Studio](https://aistudio.google.com/app) for usage
 
-## Usage
+### Socket connection issues
 
-1. Open http://localhost:3000
-2. Click "Create Room" to start a new session
-3. Share the room ID with teammates
-4. Paste code or import from GitHub
-5. Click "Run AI Analysis" to analyze code
-6. Review suggestions and apply fixes
-7. Export reports
+- Make sure port 3000 is available
+- Restart the server: `npm run dev`
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `GEMINI_API_KEY` | Google AI Studio API key (required for AI features) |
-| `PORT` | Server port (default: 3000) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | Yes | Get from [AI Studio](https://aistudio.google.com/app/apikey) |
+| `PORT` | No | Server port (default: 3000) |
+
+## API Endpoints
+
+- `POST /api/analyze` - Analyze code and return suggestions
+- `POST /api/fix` - Generate code fix for a specific issue
 
 ## Project Structure
 
 ```
-app/              - Next.js pages and API routes
-components/       - React components
-hooks/            - Custom React hooks
-lib/              - Utility libraries
-server/           - Socket.io server
+NEXT/
+├── app/              # Next.js pages and API routes
+│   ├── api/         # Server-side API endpoints
+│   ├── page.tsx     # Main page
+│   └── globals.css   # Global styles
+├── components/      # React components
+├── hooks/           # Custom React hooks
+├── lib/             # Utility libraries
+│   └── ai-service.ts
+├── server/          # Socket.io server
+├── README.md        # This file
+└── .env.local      # Environment variables (create this)
 ```
+
+## License
+
+MIT
