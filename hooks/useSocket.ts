@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import Pusher from 'pusher-js';
 
 export interface User {
   id: string;
@@ -47,8 +47,22 @@ export interface UseSocketReturn {
   applyFix: (suggestionId: string, fixedCode: string) => void;
 }
 
+const userColors = [
+  '#6366f1', '#22d3ee', '#10b981', '#f59e0b',
+  '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'
+];
+
+function generateRoomId(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+function generateUserId(): string {
+  return 'user_' + Math.random().toString(36).substring(2, 11);
+}
+
 export function useSocket(): UseSocketReturn {
-  const socketRef = useRef<Socket | null>(null);
+  const pusherRef = useRef<Pusher | null>(null);
+  const channelRef = useRef<any>(null);
   const [room, setRoom] = useState<RoomState>({
     roomId: null,
     code: '',
@@ -60,94 +74,92 @@ export function useSocket(): UseSocketReturn {
   });
   const [isConnected, setIsConnected] = useState(false);
   const [latency, setLatency] = useState(0);
-  const latencyIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerEvent = useCallback(async (eventName: string, data: any) => {
+    try {
+      await fetch('/api/pusher/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelName: `room-${room.roomId}`,
+          eventName,
+          data,
+        }),
+      });
+    } catch (error) {
+      console.error('Trigger error:', error);
+    }
+  }, [room.roomId]);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000';
-    socketRef.current = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
+    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY || 'demo';
+    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'us2';
 
-    const socket = socketRef.current;
-
-    socket.on('connect', () => {
-      setIsConnected(true);
-      console.log('Socket connected');
-    });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-      console.log('Socket disconnected');
-    });
-
-    socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
-    });
-
-    latencyIntervalRef.current = setInterval(() => {
-      const start = Date.now();
-      socket.emit('ping', () => {
-        setLatency(Date.now() - start);
+    try {
+      pusherRef.current = new Pusher(pusherKey, {
+        cluster: pusherCluster,
       });
-    }, 5000);
+      setIsConnected(true);
+    } catch (error) {
+      console.error('Pusher connection error:', error);
+    }
 
     return () => {
-      if (latencyIntervalRef.current) {
-        clearInterval(latencyIntervalRef.current);
+      if (pusherRef.current) {
+        pusherRef.current.disconnect();
       }
-      socket.disconnect();
     };
   }, []);
 
   useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
+    if (!room.roomId || !pusherRef.current) return;
 
-    socket.on('user-joined', (user: User) => {
+    const channel = pusherRef.current.subscribe(`room-${room.roomId}`);
+    channelRef.current = channel;
+
+    channel.bind('user-joined', (user: User) => {
       setRoom(prev => ({
         ...prev,
         users: [...prev.users, user],
       }));
     });
 
-    socket.on('user-left', (user: User) => {
+    channel.bind('user-left', (user: User) => {
       setRoom(prev => ({
         ...prev,
         users: prev.users.filter(u => u.id !== user.id),
       }));
     });
 
-    socket.on('code-update', (data: { code: string; userId: string; cursor?: any }) => {
+    channel.bind('code-update', (data: { code: string; userId: string; cursor?: any }) => {
       setRoom(prev => ({
         ...prev,
         code: data.code,
       }));
     });
 
-    socket.on('cursor-update', (data: { userId: string; user: User; cursor: { line: number; column: number } }) => {
+    channel.bind('cursor-update', (data: { userId: string; user: User; cursor: { line: number; column: number } }) => {
       setRoom(prev => ({
         ...prev,
         users: prev.users.map(u => u.id === data.userId ? { ...u, cursor: data.cursor } : u),
       }));
     });
 
-    socket.on('selection-update', (data: { userId: string; user: User; selection: any }) => {
+    channel.bind('selection-update', (data: { userId: string; user: User; selection: any }) => {
       setRoom(prev => ({
         ...prev,
         users: prev.users.map(u => u.id === data.userId ? { ...u, selection: data.selection } : u),
       }));
     });
 
-    socket.on('language-update', (language: string) => {
+    channel.bind('language-update', (language: string) => {
       setRoom(prev => ({
         ...prev,
         language,
       }));
     });
 
-    socket.on('analysis-complete', (data: { suggestions: Suggestion[]; readme: string }) => {
+    channel.bind('analysis-complete', (data: { suggestions: Suggestion[]; readme: string }) => {
       setRoom(prev => ({
         ...prev,
         suggestions: data.suggestions,
@@ -155,18 +167,18 @@ export function useSocket(): UseSocketReturn {
       }));
     });
 
-    socket.on('suggestion-status-update', (data: { suggestionId: string; status: string; fixedCode?: string }) => {
+    channel.bind('suggestion-status-update', (data: { suggestionId: string; status: string; fixedCode?: string }) => {
       setRoom(prev => ({
         ...prev,
-        suggestions: prev.suggestions.map(s => 
-          s.id === data.suggestionId 
+        suggestions: prev.suggestions.map(s =>
+          s.id === data.suggestionId
             ? { ...s, status: data.status as any, fixedCode: data.fixedCode }
             : s
         ),
       }));
     });
 
-    socket.on('fix-applied', (data: { suggestionId: string; code: string; userId: string }) => {
+    channel.bind('fix-applied', (data: { suggestionId: string; code: string; userId: string }) => {
       setRoom(prev => ({
         ...prev,
         code: data.code,
@@ -174,52 +186,53 @@ export function useSocket(): UseSocketReturn {
     });
 
     return () => {
-      socket.off('user-joined');
-      socket.off('user-left');
-      socket.off('code-update');
-      socket.off('cursor-update');
-      socket.off('selection-update');
-      socket.off('language-update');
-      socket.off('analysis-complete');
-      socket.off('suggestion-status-update');
-      socket.off('fix-applied');
+      if (pusherRef.current) {
+        pusherRef.current.unsubscribe(`room-${room.roomId}`);
+      }
     };
-  }, []);
+  }, [room.roomId]);
 
   const createRoom = useCallback(() => {
-    socketRef.current?.emit('create-room', (response: any) => {
-      if (response.roomId) {
-        setRoom(prev => ({
-          ...prev,
-          roomId: response.roomId,
-          currentUser: response.user,
-          users: [response.user],
-        }));
-      }
-    });
-  }, []);
+    const roomId = generateRoomId();
+    const colorIndex = Math.floor(Math.random() * userColors.length);
+    const user: User = {
+      id: generateUserId(),
+      name: `User ${Math.random().toString(36).substring(2, 6)}`,
+      color: userColors[colorIndex],
+    };
+
+    setRoom(prev => ({
+      ...prev,
+      roomId,
+      currentUser: user,
+      users: [user],
+    }));
+
+    triggerEvent('user-joined', user);
+  }, [triggerEvent]);
 
   const joinRoom = useCallback((roomId: string) => {
-    socketRef.current?.emit('join-room', roomId, (response: any) => {
-      if (response.roomId) {
-        setRoom(prev => ({
-          ...prev,
-          roomId: response.roomId,
-          currentUser: response.user,
-          code: response.code || '',
-          language: response.language || 'javascript',
-          users: response.users || [],
-          suggestions: response.suggestions || [],
-          readme: response.readme || '',
-        }));
-      } else if (response.error) {
-        console.error('Failed to join room:', response.error);
-      }
-    });
-  }, []);
+    const colorIndex = Math.floor(Math.random() * userColors.length);
+    const user: User = {
+      id: generateUserId(),
+      name: `User ${Math.random().toString(36).substring(2, 6)}`,
+      color: userColors[colorIndex],
+    };
+
+    setRoom(prev => ({
+      ...prev,
+      roomId,
+      currentUser: user,
+      users: [user],
+    }));
+
+    triggerEvent('user-joined', user);
+  }, [triggerEvent]);
 
   const leaveRoom = useCallback(() => {
-    socketRef.current?.emit('leave-room');
+    if (room.currentUser) {
+      triggerEvent('user-left', room.currentUser);
+    }
     setRoom({
       roomId: null,
       code: '',
@@ -229,33 +242,32 @@ export function useSocket(): UseSocketReturn {
       readme: '',
       currentUser: null,
     });
-  }, []);
+  }, [room.currentUser, triggerEvent]);
 
   const updateCode = useCallback((code: string, cursor?: { line: number; column: number }) => {
     setRoom(prev => ({ ...prev, code }));
-    socketRef.current?.emit('code-change', { code, cursor }, () => {});
-  }, []);
+    triggerEvent('code-change', { code, cursor, userId: room.currentUser?.id });
+  }, [triggerEvent, room.currentUser?.id]);
 
   const updateCursor = useCallback((line: number, column: number) => {
-    socketRef.current?.emit('cursor-move', { line, column });
-  }, []);
+    triggerEvent('cursor-move', { line, column, userId: room.currentUser?.id });
+  }, [triggerEvent, room.currentUser?.id]);
 
   const updateSelection = useCallback((selection: { startLine: number; startColumn: number; endLine: number; endColumn: number }) => {
-    socketRef.current?.emit('selection-change', selection);
-  }, []);
+    triggerEvent('selection-change', { ...selection, userId: room.currentUser?.id });
+  }, [triggerEvent, room.currentUser?.id]);
 
   const setLanguage = useCallback((language: string) => {
     setRoom(prev => ({ ...prev, language }));
-    socketRef.current?.emit('language-change', language);
-  }, []);
+    triggerEvent('language-change', language);
+  }, [triggerEvent]);
 
   const submitAnalysis = useCallback((suggestions: Suggestion[], readme: string) => {
-    socketRef.current?.emit('analyze-code', { suggestions, readme }, () => {});
     setRoom(prev => ({ ...prev, suggestions, readme }));
-  }, []);
+    triggerEvent('analyze-code', { suggestions, readme });
+  }, [triggerEvent]);
 
   const updateSuggestionStatus = useCallback((suggestionId: string, status: 'accepted' | 'dismissed', fixedCode?: string) => {
-    socketRef.current?.emit('suggestion-update', { suggestionId, status, fixedCode });
     setRoom(prev => ({
       ...prev,
       suggestions: prev.suggestions.map(s =>
@@ -264,12 +276,13 @@ export function useSocket(): UseSocketReturn {
           : s
       ),
     }));
-  }, []);
+    triggerEvent('suggestion-update', { suggestionId, status, fixedCode });
+  }, [triggerEvent]);
 
   const applyFix = useCallback((suggestionId: string, fixedCode: string) => {
-    socketRef.current?.emit('apply-fix', { suggestionId, fixedCode }, () => {});
     setRoom(prev => ({ ...prev, code: fixedCode }));
-  }, []);
+    triggerEvent('apply-fix', { suggestionId, fixedCode, userId: room.currentUser?.id });
+  }, [triggerEvent, room.currentUser?.id]);
 
   return {
     room,
