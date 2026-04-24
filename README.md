@@ -4,7 +4,8 @@ A real-time collaborative code review platform with AI-powered static analysis, 
 
 ## Features
 
-- **Real-Time Collaboration** - Multiple users can join a room and see each other's cursors and edits live
+- **Real-Time Collaboration** - Multiple users can join a room and see each other's cursors and edits live via Pusher
+- **BYOK (Bring Your Own Key)** - Users provide their own Google AI Studio API key (stored locally)
 - **AI Code Analysis** - Automatic detection of security vulnerabilities, anti-patterns, and code quality issues
 - **Inline Suggestions** - Click-to-apply AI-generated fixes
 - **Documentation Generation** - Auto-generate README from code
@@ -13,10 +14,10 @@ A real-time collaborative code review platform with AI-powered static analysis, 
 
 ## Tech Stack
 
-- **Next.js** - React framework
-- **Socket.io** - Real-time WebSocket communication
+- **Next.js 16** - React framework
+- **Pusher** - Real-time WebSocket communication (works on Vercel)
 - **Monaco Editor** - Code editor (VS Code engine)
-- **Gemini API** - AI-powered code analysis
+- **Google Gemini 2.0 Flash** - AI-powered code analysis
 
 ## Quick Start
 
@@ -26,57 +27,61 @@ A real-time collaborative code review platform with AI-powered static analysis, 
 pnpm install
 ```
 
-### 2. Get Gemini API Key (Required for AI Features)
-
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy the key
-
-### 3. Configure Environment
-
-Create a `.env.local` file in the project root:
+### 2. Run the App (Local Development)
 
 ```bash
-GEMINI_API_KEY=your-actual-api-key-here
+pnpm build && pnpm start
 ```
 
-Or set it temporarily in your terminal:
+Open http://localhost:3000
 
-```bash
-export GEMINI_API_KEY=your-actual-api-key-here
-```
+### 3. Configure API Key (In-App)
 
-### 4. Run the App
+1. Click the ⚙️ **Settings** button in the header
+2. Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+3. Paste it and click "Save Key"
 
-```bash
-npm run dev
-```
+The API key is stored in your browser's localStorage - no server configuration needed!
 
-### 5. Open Browser
+## Deployment
 
-Navigate to http://localhost:3000
+### Deploy to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button.svg)](https://vercel.com/new/clone?repository-url=https://github.com/Itz-snj/byteblaster_ps09)
+
+### Configure Environment Variables in Vercel
+
+Go to **Settings → Environment Variables** and add:
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_PUSHER_KEY` | `2feddeabf6a836f7595e` |
+| `NEXT_PUBLIC_PUSHER_CLUSTER` | `ap2` |
+| `PUSHER_APP_ID` | `2146175` |
+| `PUSHER_SECRET` | `b8686e2d7c17e44d0221` |
+
+After adding variables, **redeploy** the app.
 
 ## Usage Guide
 
 ### Creating a Room
 
 1. Click "Create Room" to generate a unique room ID
-2. Share the room URL with teammates
-3. Anyone with the link can join
+2. Share the room ID with teammates
+3. They can click "Join Room" and enter the ID
 
 ### Importing Code
 
 - **Paste directly** - Copy code and paste into the sidebar
 - **GitHub import** - Enter a raw GitHub file URL
-- The language is auto-detected
+- Language is auto-detected
 
 ### Running AI Analysis
 
-1. Make sure code is loaded in the editor
+1. Load code in the editor
 2. Click the "Analysis" tab in the sidebar
 3. Click "Run AI Analysis"
-4. Wait for results (check console for progress)
+4. Results appear in the Suggestions panel
 
 ### Reviewing Suggestions
 
@@ -84,65 +89,68 @@ Navigate to http://localhost:3000
 - **Warning** (yellow) - Anti-patterns, performance issues
 - **Info** (blue) - Code style improvements
 
-Click on a suggestion to highlight the relevant code. Click "Accept" to apply the fix or "Dismiss" to ignore.
+Click "Accept" to apply the fix or "Dismiss" to ignore.
 
 ### Exporting Reports
 
 1. Click the "Export" button in the header
-2. Choose format (Markdown/PDF)
+2. Choose Markdown format
 3. Copy or download the report
 
 ## Troubleshooting
 
-### "GEMINI_API_KEY not configured"
+### "No API key provided"
 
-Make sure your API key is set in `.env.local` or as an environment variable:
+- Click ⚙️ Settings in the header
+- Add your Google AI Studio API key
+- The key is stored locally in your browser
 
-```bash
-# Verify it's set
-echo $GEMINI_API_KEY
+### Real-time not working
 
-# If not, set it
-export GEMINI_API_KEY=your-key-here
-```
+- Verify Pusher credentials are set in Vercel
+- Check browser console for connection errors
+- Redeploy after adding environment variables
 
 ### API quota exceeded
 
 - Free tier has rate limits
 - Check [Google AI Studio](https://aistudio.google.com/app) for usage
 
-### Socket connection issues
-
-- Make sure port 3000 is available
-- Restart the server: `npm run dev`
-
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GEMINI_API_KEY` | Yes | Get from [AI Studio](https://aistudio.google.com/app/apikey) |
-| `PORT` | No | Server port (default: 3000) |
-
-## API Endpoints
-
-- `POST /api/analyze` - Analyze code and return suggestions
-- `POST /api/fix` - Generate code fix for a specific issue
+| `NEXT_PUBLIC_PUSHER_KEY` | Yes | Pusher public key |
+| `NEXT_PUBLIC_PUSHER_CLUSTER` | Yes | Pusher cluster (e.g., `ap2`) |
+| `PUSHER_APP_ID` | Yes | Pusher app ID |
+| `PUSHER_SECRET` | Yes | Pusher secret |
+| `GEMINI_API_KEY` | No | Server-side key (users can provide their own) |
 
 ## Project Structure
 
 ```
 NEXT/
-├── app/              # Next.js pages and API routes
-│   ├── api/         # Server-side API endpoints
-│   ├── page.tsx     # Main page
-│   └── globals.css   # Global styles
-├── components/      # React components
-├── hooks/           # Custom React hooks
-├── lib/             # Utility libraries
-│   └── ai-service.ts
-├── server/          # Socket.io server
-├── README.md        # This file
-└── .env.local      # Environment variables (create this)
+├── app/                    # Next.js pages and API routes
+│   ├── api/
+│   │   ├── analyze/       # AI code analysis
+│   │   ├── fix/           # AI fix generation
+│   │   └── pusher/        # Pusher event trigger
+│   ├── page.tsx           # Main page
+│   └── globals.css        # Global styles
+├── components/            # React components
+│   ├── CodeCollabApp.tsx  # Main app component
+│   ├── CodeEditor.tsx     # Monaco editor
+│   ├── Header.tsx         # Header with room controls
+│   ├── Sidebar.tsx        # Sidebar with import/analysis
+│   └── SettingsModal.tsx  # API key settings
+├── hooks/
+│   ├── useSocket.ts       # Pusher real-time hooks
+│   └── useApiKey.ts       # API key localStorage hook
+├── lib/
+│   └── ai-service.ts      # AI service client
+├── .env.example           # Environment variables template
+├── DEPLOY.md              # Deployment guide
+└── README.md              # This file
 ```
 
 ## License
