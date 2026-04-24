@@ -6,7 +6,7 @@ import { initSocketServer } from './socket-server';
 const PORT = process.env.PORT || 3000;
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = process.env.HOSTNAME || 'localhost';
 
 const app = next({ dev, hostname, port: Number(PORT) });
 const handle = app.getRequestHandler();

@@ -63,7 +63,7 @@ export function useSocket(): UseSocketReturn {
   const latencyIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const socketUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000';
     socketRef.current = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
