@@ -56,8 +56,10 @@ function generateRoomId(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-function generateUserId(): string {
-  return 'user_' + Math.random().toString(36).substring(2, 11);
+let globalUserId = 'user_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+
+function getUserId(): string {
+  return globalUserId;
 }
 
 export function useSocket(): UseSocketReturn {
@@ -121,10 +123,15 @@ export function useSocket(): UseSocketReturn {
     channelRef.current = channel;
 
     channel.bind('user-joined', (user: User) => {
-      setRoom(prev => ({
-        ...prev,
-        users: [...prev.users, user],
-      }));
+      setRoom(prev => {
+        if (prev.users.some(u => u.id === user.id)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          users: [...prev.users, user],
+        };
+      });
     });
 
     channel.bind('user-left', (user: User) => {
@@ -199,7 +206,7 @@ export function useSocket(): UseSocketReturn {
     const roomId = generateRoomId();
     const colorIndex = Math.floor(Math.random() * userColors.length);
     const user: User = {
-      id: generateUserId(),
+      id: getUserId(),
       name: `User ${Math.random().toString(36).substring(2, 6)}`,
       color: userColors[colorIndex],
     };
@@ -217,7 +224,7 @@ export function useSocket(): UseSocketReturn {
   const joinRoom = useCallback((roomId: string) => {
     const colorIndex = Math.floor(Math.random() * userColors.length);
     const user: User = {
-      id: generateUserId(),
+      id: getUserId(),
       name: `User ${Math.random().toString(36).substring(2, 6)}`,
       color: userColors[colorIndex],
     };
