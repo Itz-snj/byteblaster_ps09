@@ -4,15 +4,16 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = 'gemini-2.0-flash-001';
 
 export async function POST(request: NextRequest) {
+  const { code, issue, language, apiKey } = await request.json();
+  
+  const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY || '';
+  
   if (!GEMINI_API_KEY) {
     return NextResponse.json(
-      { error: 'GEMINI_API_KEY not configured' },
-      { status: 500 }
+      { error: 'No API key provided. Please add your Gemini API key in settings.' },
+      { status: 401 }
     );
   }
-
-  try {
-    const { code, issue, language } = await request.json();
 
     const prompt = `You are an expert code reviewer. Generate a fixed version of the code that addresses this issue:
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Suggestion } from '../hooks/useSocket';
 import { analyzeCode, importFromGitHub } from '../lib/ai-service';
+import { useApiKey } from '../hooks/useApiKey';
 
 interface SidebarProps {
   code: string;
@@ -41,6 +42,8 @@ export default function Sidebar({
   const [githubUrl, setGithubUrl] = useState('');
   const [importError, setImportError] = useState('');
   const [importing, setImporting] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
+  const { apiKey, hasApiKey } = useApiKey();
 
   const handleImportFromUrl = async () => {
     if (!githubUrl.trim()) return;
@@ -63,11 +66,19 @@ export default function Sidebar({
   const handleAnalyze = async () => {
     if (!code.trim()) return;
     
+    if (!hasApiKey) {
+      setAnalysisError('Please add your Google AI Studio API key in Settings first.');
+      return;
+    }
+    
+    setAnalysisError('');
     onAnalyze([], '');
-    const result = await analyzeCode(code, language);
+    const result = await analyzeCode(code, language, apiKey || undefined);
     
     if (result.suggestions.length > 0 || result.readme) {
       onAnalyze(result.suggestions, result.readme);
+    } else if (result.readme && result.readme.includes('API key')) {
+      setAnalysisError(result.readme);
     }
   };
 
@@ -187,6 +198,16 @@ export default function Sidebar({
                       <>🔍 Run AI Analysis</>
                     )}
                   </button>
+
+                  {analysisError && (
+                    <p className="error analysis-error">{analysisError}</p>
+                  )}
+
+                  {!hasApiKey && (
+                    <p className="api-key-warning">
+                      ⚠️ Please configure your API key in Settings to use AI analysis.
+                    </p>
+                  )}
 
                   <div className="analysis-stats">
                     <div className="stat critical">

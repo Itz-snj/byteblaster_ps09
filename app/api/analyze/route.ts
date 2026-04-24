@@ -88,16 +88,16 @@ function detectLanguage(code: string, filename?: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const { code, language, filename, apiKey } = await request.json();
+  
+  const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY || '';
+  
   if (!GEMINI_API_KEY) {
     return NextResponse.json(
-      { error: 'GEMINI_API_KEY not configured' },
-      { status: 500 }
+      { error: 'No API key provided. Please add your Gemini API key in settings.' },
+      { status: 401 }
     );
   }
-
-  try {
-    const { code, language, filename } = await request.json();
-    const detectedLang = language || detectLanguage(code, filename);
 
     const prompt = `You are an expert code reviewer. Analyze the following ${detectedLang} code and identify security vulnerabilities, anti-patterns, code quality issues, and potential bugs.
 

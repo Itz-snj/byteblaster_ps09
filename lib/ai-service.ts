@@ -1,6 +1,7 @@
 'use client';
 
 import { Suggestion } from '../hooks/useSocket';
+import { useApiKey } from '../hooks/useApiKey';
 
 const API_BASE = '/api';
 
@@ -79,18 +80,19 @@ function generateUUID(): string {
   });
 }
 
-export async function analyzeCode(code: string, language?: string): Promise<AnalysisResult> {
+export async function analyzeCode(code: string, language?: string, apiKey?: string): Promise<AnalysisResult> {
   const detectedLang = language || detectLanguage(code);
 
   try {
     const response = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language: detectedLang }),
+      body: JSON.stringify({ code, language: detectedLang, apiKey }),
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error || `API error: ${response.status}`);
     }
 
     return await response.json();
@@ -98,22 +100,23 @@ export async function analyzeCode(code: string, language?: string): Promise<Anal
     console.error('Analysis error:', error);
     return {
       suggestions: [],
-      readme: 'Analysis service unavailable.',
+      readme: error instanceof Error ? error.message : 'Analysis service unavailable.',
       language: detectedLang,
     };
   }
 }
 
-export async function generateFix(code: string, issue: string, language: string): Promise<string> {
+export async function generateFix(code: string, issue: string, language: string, apiKey?: string): Promise<string> {
   try {
     const response = await fetch(`${API_BASE}/fix`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, issue, language }),
+      body: JSON.stringify({ code, issue, language, apiKey }),
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error || `API error: ${response.status}`);
     }
 
     const data = await response.json();

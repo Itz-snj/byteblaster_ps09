@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useSocket, Suggestion, User } from '../hooks/useSocket';
+import { useApiKey } from '../hooks/useApiKey';
 import { generateFix, detectLanguage } from '../lib/ai-service';
 import CodeEditor from '../components/CodeEditor';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import StatusBar from '../components/StatusBar';
+import SettingsModal from '../components/SettingsModal';
 
 export default function CodeCollabApp() {
   const {
@@ -28,6 +30,8 @@ export default function CodeCollabApp() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [showSettings, setShowSettings] = useState(false);
+  const { hasApiKey } = useApiKey();
 
   const handleCodeChange = useCallback((code: string) => {
     updateCode(code);
@@ -162,6 +166,8 @@ export default function CodeCollabApp() {
         onJoinRoom={joinRoom}
         onLeaveRoom={leaveRoom}
         onExport={handleExport}
+        onOpenSettings={() => setShowSettings(true)}
+        hasApiKey={hasApiKey}
       />
 
       <main className="main-content">
@@ -207,6 +213,11 @@ export default function CodeCollabApp() {
         language={room.language}
         userCount={room.users.length}
         syncStatus={syncStatus}
+      />
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
     </div>
   );

@@ -14,6 +14,8 @@ interface HeaderProps {
   onJoinRoom: (roomId: string) => void;
   onLeaveRoom: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
+  onOpenSettings?: () => void;
+  hasApiKey?: boolean;
 }
 
 export default function Header({
@@ -26,6 +28,8 @@ export default function Header({
   onJoinRoom,
   onLeaveRoom,
   onExport,
+  onOpenSettings,
+  hasApiKey,
 }: HeaderProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [joinRoomId, setJoinRoomId] = useState('');
@@ -114,6 +118,14 @@ export default function Header({
       </div>
 
       <div className="header-right">
+        <button 
+          className={`settings-btn ${hasApiKey ? 'configured' : ''}`}
+          onClick={onOpenSettings}
+          title="Settings - Configure API Key"
+        >
+          ⚙️ {hasApiKey ? '✓' : '!'}
+        </button>
+
         <div className="connection-status">
           <span 
             className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}

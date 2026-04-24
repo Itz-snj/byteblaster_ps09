@@ -16,3 +16,4 @@ coverage/
 out/
 .nuxt/
 .cache/
+.vercel
