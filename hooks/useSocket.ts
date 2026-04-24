@@ -75,13 +75,16 @@ export function useSocket(): UseSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [latency, setLatency] = useState(0);
 
-  const triggerEvent = useCallback(async (eventName: string, data: any) => {
+  const triggerEvent = useCallback(async (eventName: string, data: any, roomId?: string) => {
+    const roomToUse = roomId || room.roomId;
+    if (!roomToUse) return;
+    
     try {
       await fetch('/api/pusher/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          channelName: `room-${room.roomId}`,
+          channelName: `room-${roomToUse}`,
           eventName,
           data,
         }),
@@ -208,7 +211,7 @@ export function useSocket(): UseSocketReturn {
       users: [user],
     }));
 
-    triggerEvent('user-joined', user);
+    triggerEvent('user-joined', user, roomId);
   }, [triggerEvent]);
 
   const joinRoom = useCallback((roomId: string) => {
@@ -226,12 +229,12 @@ export function useSocket(): UseSocketReturn {
       users: [user],
     }));
 
-    triggerEvent('user-joined', user);
+    triggerEvent('user-joined', user, roomId);
   }, [triggerEvent]);
 
   const leaveRoom = useCallback(() => {
-    if (room.currentUser) {
-      triggerEvent('user-left', room.currentUser);
+    if (room.currentUser && room.roomId) {
+      triggerEvent('user-left', room.currentUser, room.roomId);
     }
     setRoom({
       roomId: null,
@@ -242,30 +245,30 @@ export function useSocket(): UseSocketReturn {
       readme: '',
       currentUser: null,
     });
-  }, [room.currentUser, triggerEvent]);
+  }, [room.currentUser, room.roomId, triggerEvent]);
 
   const updateCode = useCallback((code: string, cursor?: { line: number; column: number }) => {
     setRoom(prev => ({ ...prev, code }));
-    triggerEvent('code-change', { code, cursor, userId: room.currentUser?.id });
-  }, [triggerEvent, room.currentUser?.id]);
+    triggerEvent('code-change', { code, cursor, userId: room.currentUser?.id }, room.roomId || undefined);
+  }, [triggerEvent, room.currentUser?.id, room.roomId]);
 
   const updateCursor = useCallback((line: number, column: number) => {
-    triggerEvent('cursor-move', { line, column, userId: room.currentUser?.id });
-  }, [triggerEvent, room.currentUser?.id]);
+    triggerEvent('cursor-move', { line, column, userId: room.currentUser?.id }, room.roomId || undefined);
+  }, [triggerEvent, room.currentUser?.id, room.roomId]);
 
   const updateSelection = useCallback((selection: { startLine: number; startColumn: number; endLine: number; endColumn: number }) => {
-    triggerEvent('selection-change', { ...selection, userId: room.currentUser?.id });
-  }, [triggerEvent, room.currentUser?.id]);
+    triggerEvent('selection-change', { ...selection, userId: room.currentUser?.id }, room.roomId || undefined);
+  }, [triggerEvent, room.currentUser?.id, room.roomId]);
 
   const setLanguage = useCallback((language: string) => {
     setRoom(prev => ({ ...prev, language }));
-    triggerEvent('language-change', language);
-  }, [triggerEvent]);
+    triggerEvent('language-change', language, room.roomId || undefined);
+  }, [triggerEvent, room.roomId]);
 
   const submitAnalysis = useCallback((suggestions: Suggestion[], readme: string) => {
     setRoom(prev => ({ ...prev, suggestions, readme }));
-    triggerEvent('analyze-code', { suggestions, readme });
-  }, [triggerEvent]);
+    triggerEvent('analyze-code', { suggestions, readme }, room.roomId || undefined);
+  }, [triggerEvent, room.roomId]);
 
   const updateSuggestionStatus = useCallback((suggestionId: string, status: 'accepted' | 'dismissed', fixedCode?: string) => {
     setRoom(prev => ({
@@ -276,13 +279,13 @@ export function useSocket(): UseSocketReturn {
           : s
       ),
     }));
-    triggerEvent('suggestion-update', { suggestionId, status, fixedCode });
-  }, [triggerEvent]);
+    triggerEvent('suggestion-update', { suggestionId, status, fixedCode }, room.roomId || undefined);
+  }, [triggerEvent, room.roomId]);
 
   const applyFix = useCallback((suggestionId: string, fixedCode: string) => {
     setRoom(prev => ({ ...prev, code: fixedCode }));
-    triggerEvent('apply-fix', { suggestionId, fixedCode, userId: room.currentUser?.id });
-  }, [triggerEvent, room.currentUser?.id]);
+    triggerEvent('apply-fix', { suggestionId, fixedCode, userId: room.currentUser?.id }, room.roomId || undefined);
+  }, [triggerEvent, room.currentUser?.id, room.roomId]);
 
   return {
     room,
