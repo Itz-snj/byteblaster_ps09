@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  try {
     const prompt = `You are an expert code reviewer. Generate a fixed version of the code that addresses this issue:
 
 Issue: ${issue}

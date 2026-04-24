@@ -99,6 +99,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  try {
+    const detectedLang = language || detectLanguage(code, filename);
+
     const prompt = `You are an expert code reviewer. Analyze the following ${detectedLang} code and identify security vulnerabilities, anti-patterns, code quality issues, and potential bugs.
 
 Return your analysis as a JSON array with this exact structure:
